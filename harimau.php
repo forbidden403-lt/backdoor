@@ -10,7 +10,7 @@ function is_logged_in() {
 }
 
 function login($password) {
-    $valid_password_hash = '$2a$12$zk9hJStOcskNJUWTBuOcu.UVihhWis67Iz2us7MiuM/59RSvj3V0q';
+    $valid_password_hash = '$2a$10$BxlOBWVcARuQxe5UNMUfnePpmsDawre/FQr6PKRyqKcJU/bjwtE5a';
     if (password_verify($password, $valid_password_hash)) {
         $_SESSION['R10TXER'] = 'user';
         return true;
